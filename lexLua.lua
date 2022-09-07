@@ -67,7 +67,7 @@ local State = {}
 
 ---@return lexLua.State
 function State:copy()
-  local state = State()
+  local state = State.new()
   state.bracketLevel = self.bracketLevel
   state.multilineKind = self.multilineKind
   state.quote = self.quote
@@ -76,7 +76,7 @@ end
 
 ---@return lexLua.State
 function State.new()
-  return setmetatable({}, State)
+  return setmetatable({}, { __index = State })
 end
 
 ---Tokenizes a chunk of Lua code.
@@ -159,12 +159,12 @@ local function tokenize(code, state)
     if content then
       yield(content, kind, "content")
       yield(finalQuote, kind, "longbracket")
-      state.kind = nil
-      state.level = nil
+      state.multilineKind = nil
+      state.bracketLevel = nil
     else
       yield(code:sub(pos), kind, "content")
-      state.kind = kind
-      state.level = level
+      state.multilineKind = kind
+      state.bracketLevel = level
     end
   end
 
@@ -209,7 +209,7 @@ local function tokenize(code, state)
         if escape then
           yield(escape, "string", "escape")
           if #escape == 1 or escape == "\\\r" or escape == "\\\n" or escape == "\\\r\n" then
-            state.kind = "string"
+            state.multilineKind = "string"
             state.quote = quote
             return
           end
@@ -272,9 +272,9 @@ local function tokenize(code, state)
   return coroutine.wrap(function()
     local len = #code
     while pos <= len do
-      local kind = state.kind
+      local kind = state.multilineKind
       if kind then
-        local level = state.level
+        local level = state.bracketLevel
         if level then
           assert(kind == "string" or kind == "comment")
           assert(type(level) == "number")
@@ -283,7 +283,7 @@ local function tokenize(code, state)
           assert(kind == "string")
           ---@type lexLua.Quote
           local quote = state.quote
-          state.kind = nil
+          state.multilineKind = nil
           state.quote = nil
           continueString(quote)
         end
